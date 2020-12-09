@@ -34,6 +34,7 @@ import tensorflow_datasets as tfds
 from flax import nn
 from flax import optim
 from flax.metrics import tensorboard
+from flax.training import checkpoints
 
 
 class CNN(nn.Module):
@@ -169,6 +170,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, model_dir: str):
   model = create_model(init_rng)
   optimizer = create_optimizer(model, config.learning_rate, config.momentum)
 
+  # Restore saved model
+  optimizer = checkpoints.restore_checkpoint(model_dir, optimizer)
+
   for epoch in range(1, config.num_epochs + 1):
     rng, input_rng = random.split(rng)
     optimizer, train_metrics = train_epoch(
@@ -182,6 +186,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, model_dir: str):
     summary_writer.scalar('train_accuracy', train_metrics['accuracy'], epoch)
     summary_writer.scalar('eval_loss', loss, epoch)
     summary_writer.scalar('eval_accuracy', accuracy, epoch)
+
+    # Save model at every epoch
+    checkpoints.save_checkpoint(model_dir, optimizer, epoch, keep=3)
 
   summary_writer.flush()
   return optimizer
