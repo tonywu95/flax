@@ -184,10 +184,10 @@ def compute_metrics(logits, labels, weights, label_smoothing=0.0):
 
 def train_step(optimizer,
                batch,
+               dropout_rng,
                config,
                learning_rate_fn,
-               label_smoothing=0.0,
-               dropout_rng=None):
+               label_smoothing=0.0):
   """Perform a single training step."""
   # X_position and X_segmentation are needed only when using "packed examples"
   # where multiple sequences are packed into the same example with this
@@ -449,14 +449,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
       base_learning_rate=config.learning_rate, warmup_steps=config.warmup_steps)
 
   # compile multidevice versions of train/eval/predict step and cache init fn.
-  p_train_step = jax.pmap(
+  p_train_step = jax.vmap(
       functools.partial(
           train_step,
           config=train_config,
           learning_rate_fn=learning_rate_fn,
           label_smoothing=config.label_smoothing),
-      axis_name="batch",
-      donate_argnums=(0,))  # pytype: disable=wrong-arg-types
+      axis_name="batch")#,
+      #donate_argnums=(0,))  # pytype: disable=wrong-arg-types
   p_eval_step = jax.pmap(
       functools.partial(
           eval_step, config=eval_config,
@@ -488,7 +488,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     # Shard data to devices and do a training step.
     batch = common_utils.shard(jax.tree_map(lambda x: x._numpy(), batch))  # pylint: disable=protected-access
     optimizer, metrics, dropout_rngs = p_train_step(
-        optimizer, batch, dropout_rng=dropout_rngs)
+        optimizer, batch, dropout_rngs)
     metrics_all.append(metrics)
 
     # Quick indication that training is happening.
