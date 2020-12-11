@@ -41,7 +41,7 @@ def get_config():
   config.reverse_translation = False
 
   # Per host batch size for training.
-  config.batch_size = 256
+  config.batch_size = 16
 
   # Beam size for inference.
   config.beam_size = 4
@@ -116,5 +116,8 @@ def get_config():
 
   # Integer for PRNG random seed.
   config.seed = 0
+
+  # Debug mode
+  config.debug = True
 
   return config

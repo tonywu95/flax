@@ -43,7 +43,8 @@ import bleu
 import decode
 import input_pipeline
 import models
-
+# from jax.config import config
+# config.update('jax_disable_jit', True)
 
 def create_learning_rate_scheduler(
     factors="constant * linear_warmup * rsqrt_decay",
@@ -449,14 +450,23 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
       base_learning_rate=config.learning_rate, warmup_steps=config.warmup_steps)
 
   # compile multidevice versions of train/eval/predict step and cache init fn.
-  p_train_step = jax.pmap(
-      functools.partial(
+  if config.debug:
+    p_train_step = jax.vmap(
+        functools.partial(
           train_step,
           config=train_config,
           learning_rate_fn=learning_rate_fn,
           label_smoothing=config.label_smoothing),
-      axis_name="batch",
-      donate_argnums=(0,))  # pytype: disable=wrong-arg-types
+        axis_name="batch")
+  else:
+    p_train_step = jax.pmap(
+        functools.partial(
+          train_step,
+          config=train_config,
+          learning_rate_fn=learning_rate_fn,
+          label_smoothing=config.label_smoothing),
+        axis_name="batch",
+        donate_argnums=(0,))  # pytype: disable=wrong-arg-types
   p_eval_step = jax.pmap(
       functools.partial(
           eval_step, config=eval_config,
