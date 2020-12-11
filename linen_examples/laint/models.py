@@ -48,6 +48,7 @@ class TransformerConfig:
   attention_dropout_rate: float = 0.1
   deterministic: bool = False
   decode: bool = False
+  latent: bool = False
   kernel_init: Callable = nn.initializers.xavier_uniform()
   bias_init: Callable = nn.initializers.normal(stddev=1e-6)
   posemb_init: Optional[Callable] = None
@@ -305,6 +306,56 @@ class EncoderDecoder1DBlock(nn.Module):
     return y + z
 
 
+class Decoder1DBlock(nn.Module):
+  """Transformer encoder-decoder layer.
+
+  Args:
+    config: TransformerConfig dataclass containing hyperparameters.
+  """
+  config: TransformerConfig
+
+  @nn.compact
+  def __call__(self,
+               targets,
+               encoded,
+               decoder_mask=None):
+    """Applies Decoder1DBlock module.
+
+    Args:
+      targets: input data for decoder
+      encoded: input data from encoder
+      decoder_mask: decoder self-attention mask.
+
+    Returns:
+      output after transformer encoder-decoder block.
+    """
+    cfg = self.config
+
+    # Decoder block.
+    assert targets.ndim == 3
+    x = nn.LayerNorm(dtype=cfg.dtype)(targets)
+    x = nn.SelfAttention(
+        num_heads=cfg.num_heads,
+        dtype=cfg.dtype,
+        qkv_features=cfg.qkv_dim,
+        kernel_init=cfg.kernel_init,
+        bias_init=cfg.bias_init,
+        use_bias=False,
+        broadcast_dropout=False,
+        dropout_rate=cfg.attention_dropout_rate,
+        deterministic=cfg.deterministic,
+        decode=cfg.decode)(x, decoder_mask)
+    x = nn.Dropout(rate=cfg.dropout_rate)(
+        x, deterministic=cfg.deterministic)
+    x = x + targets
+
+    # MLP block.
+    z = nn.LayerNorm(dtype=cfg.dtype)(x)
+    z = MlpBlock(config=cfg)(z)
+
+    return z + x
+
+
 class Encoder(nn.Module):
   """Transformer Model Encoder for sequence to sequence translation.
 
@@ -440,6 +491,84 @@ class Decoder(nn.Module):
     return logits
 
 
+class LatentDecoder(nn.Module):
+  """Transformer Model Decoder for sequence to sequence translation.
+
+  Args:
+    config: TransformerConfig dataclass containing hyperparameters.
+    shared_embedding: a shared embedding layer to use.
+  """
+  config: TransformerConfig
+  shared_embedding: Any = None
+
+  @nn.compact
+  def __call__(self,
+               encoded,
+               targets,
+               targets_positions=None,
+               decoder_mask=None):
+    """Applies Transformer model on the inputs.
+
+    Args:
+      encoded: encoded input data from encoder.
+      targets: target inputs.
+      targets_positions: input subsequence positions for packed examples.
+      decoder_mask: decoder self-attention mask.
+      encoder_decoder_mask: encoder-decoder attention mask.
+
+    Returns:
+      output of a transformer decoder.
+    """
+    cfg = self.config
+
+    assert encoded.ndim == 3  # (batch, len, depth)
+    assert targets.ndim == 2  # (batch, len)
+
+    # Target Embedding
+    if self.shared_embedding is None:
+      output_embed = nn.Embed(
+          num_embeddings=cfg.output_vocab_size,
+          features=cfg.emb_dim,
+          embedding_init=nn.initializers.normal(stddev=1.0))
+    else:
+      output_embed = self.shared_embedding
+
+    y = targets.astype('int32')
+    if not cfg.decode:
+      y = shift_right(y)
+    y = output_embed(y)
+    y = AddPositionEmbs(config=cfg, decode=cfg.decode, name='posembed_output')(
+        y, inputs_positions=targets_positions)
+    y = nn.Dropout(rate=cfg.dropout_rate)(
+        y, deterministic=cfg.deterministic)
+
+    y = y.astype(cfg.dtype)
+
+    # Target-Input Decoder
+    for lyr in range(cfg.num_layers):
+      y = Decoder1DBlock(
+          config=cfg, name=f'decoderblock_{lyr}')(
+              y,
+              encoded,
+              decoder_mask=decoder_mask)
+    y = nn.LayerNorm(dtype=cfg.dtype, name='decoder_norm')(y)
+
+    # Decoded Logits
+    if cfg.logits_via_embedding:
+      # Use the transpose of embedding matrix for logit transform.
+      logits = output_embed.attend(y.astype(jnp.float32))
+      # Correctly normalize pre-softmax logits for this shared case.
+      logits = logits / jnp.sqrt(y.shape[-1])
+    else:
+      logits = nn.Dense(
+          cfg.output_vocab_size,
+          dtype=cfg.dtype,
+          kernel_init=cfg.kernel_init,
+          bias_init=cfg.bias_init,
+          name='logitdense')(y)
+    return logits
+
+
 class Transformer(nn.Module):
   """Transformer Model for sequence to sequence translation.
 
@@ -464,8 +593,12 @@ class Transformer(nn.Module):
 
     self.encoder = Encoder(config=cfg,
                            shared_embedding=self.shared_embedding)
-    self.decoder = Decoder(config=cfg,
-                           shared_embedding=self.shared_embedding)
+    if cfg.latent:
+        self.decoder = LatentDecoder(config=cfg,
+                                     shared_embedding=self.shared_embedding)
+    else:
+        self.decoder = Decoder(config=cfg,
+                               shared_embedding=self.shared_embedding)
 
   def encode(self,
              inputs,
@@ -482,6 +615,7 @@ class Transformer(nn.Module):
       encoded feature array from the transformer encoder.
     """
     cfg = self.config
+    import pdb;pdb.set_trace()
     # Make padding attention mask.
     encoder_mask = nn.make_attention_mask(
         inputs > 0, inputs > 0, dtype=cfg.dtype)
@@ -548,12 +682,19 @@ class Transformer(nn.Module):
                                  inputs_segmentation,
                                  jnp.equal,
                                  dtype=cfg.dtype))
-    logits = self.decoder(
-        encoded,
-        targets,
-        targets_positions=targets_positions,
-        decoder_mask=decoder_mask,
-        encoder_decoder_mask=encoder_decoder_mask)
+    if cfg.latent:
+      logits = self.decoder(
+            encoded,
+            targets,
+            targets_positions=targets_positions,
+            decoder_mask=decoder_mask)
+    else:
+      logits = self.decoder(
+            encoded,
+            targets,
+            targets_positions=targets_positions,
+            decoder_mask=decoder_mask,
+            encoder_decoder_mask=encoder_decoder_mask)
     return logits.astype(self.config.dtype)
 
   def __call__(self,

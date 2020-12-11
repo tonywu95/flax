@@ -24,6 +24,8 @@ def get_config():
   # Path to load or store sentencepiece vocab file.
   config.vocab_path = None
 
+  config.data_dir = "copy_data"
+
   # Vocabulary size if `vocab_path` is not given.
   config.vocab_size = 30 
 
@@ -73,6 +75,9 @@ def get_config():
   config.max_eval_target_length = 256
   # Maximum length cutoff for predicted tokens.
   config.max_predict_length = 256
+
+  # whether use latent decoder
+  config.latent = True
 
   # Inputs and targets share embedding.
   config.share_embeddings = True

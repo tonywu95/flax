@@ -33,7 +33,7 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 # -----------------------------------------------------------------------------
 # Raw TFDS dataset.
 # -----------------------------------------------------------------------------
-def raw_wmt_datasets(dataset_name='wmt17_translate/de-en',
+def raw_wmt_datasets(data_dir=".",
                      eval_dataset_name=None,
                      reverse_translation=False,
                      shard_idx=0,
@@ -85,10 +85,9 @@ def raw_wmt_datasets(dataset_name='wmt17_translate/de-en',
   # target_lang = features_info.supervised_keys[1]
   # if reverse_translation:
   #   input_lang, target_lang = target_lang, input_lang
-  parent_dir = "copy_data"
   def load_data(name):
-    src_data = tf.data.TextLineDataset(osp.join(parent_dir, "{}.src".format(name)))
-    tgt_data = tf.data.TextLineDataset(osp.join(parent_dir, "{}.tgt".format(name)))
+    src_data = tf.data.TextLineDataset(osp.join(data_dir, "{}.src".format(name)))
+    tgt_data = tf.data.TextLineDataset(osp.join(data_dir, "{}.tgt".format(name)))
     zip_data = tf.data.Dataset.zip((src_data, tgt_data))
     return zip_data
   raw_train = load_data("train")
@@ -449,8 +448,8 @@ def _pack_with_tf_ops(dataset, keys, length):
 def preprocess_wmt_data(dataset,
                         training,
                         n_devices,
-                        dynamic_batching=False,
-                        pack_examples=True,
+                        dynamic_batching=True,
+                        pack_examples=False,
                         shuffle_buffer_size=1024,
                         max_length=512,
                         batch_size=256,
@@ -500,7 +499,7 @@ def preprocess_wmt_data(dataset,
 
 
 def get_wmt_datasets(n_devices,
-                     dataset_name='wmt17_translate/de-en',
+                     data_dir='wmt17_translate/de-en',
                      eval_dataset_name=None,
                      vocab_path=None,
                      target_vocab_size=30,  # 32000
@@ -519,11 +518,11 @@ def get_wmt_datasets(n_devices,
     vocab_path = os.path.expanduser('~/wmt_sentencepiece_model')
 
   train_data, eval_data = raw_wmt_datasets(
-      dataset_name=dataset_name,
+      data_dir=data_dir,
       eval_dataset_name=eval_dataset_name)
 
   try:
-    sp_tokenizer = load_sentencepiece_tokenizer(vocab_path, add_eos=True)
+    sp_tokenizer = load_sentencepiece_tokenizer(vocab_path, add_bos=True, add_eos=True)
   except tf.errors.NotFoundError:
     logging.info('SentencePiece vocab not found, building one from data.')
     abs_vocab_path = train_sentencepiece(
@@ -533,7 +532,7 @@ def get_wmt_datasets(n_devices,
         character_coverage=1.0,
         model_path=vocab_path,
         data_keys=('inputs', 'targets'))
-    sp_tokenizer = load_sentencepiece_tokenizer(abs_vocab_path, add_eos=True)
+    sp_tokenizer = load_sentencepiece_tokenizer(abs_vocab_path, add_bos=True, add_eos=True)
 
   # Encode strings with sentencepiece tokenizer.
   def tokenize(data):
