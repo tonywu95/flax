@@ -506,8 +506,8 @@ def get_wmt_datasets(n_devices,
                      max_corpus_chars=10000,
                      batch_size=256,
                      bucket_length=32,
-                     dynamic_batching=False,
-                     pack_examples=True,
+                     dynamic_batching=True,
+                     pack_examples=False,
                      max_length=256,
                      max_eval_length=256):
   """Load and return dataset of batched examples for use during training."""

@@ -383,7 +383,6 @@ class Encoder(nn.Module):
     """
     cfg = self.config
     assert inputs.ndim == 2  # (batch, len)
-
     # Input Embedding
     if self.shared_embedding is None:
       input_embed = nn.Embed(
@@ -615,7 +614,6 @@ class Transformer(nn.Module):
       encoded feature array from the transformer encoder.
     """
     cfg = self.config
-    import pdb;pdb.set_trace()
     # Make padding attention mask.
     encoder_mask = nn.make_attention_mask(
         inputs > 0, inputs > 0, dtype=cfg.dtype)
