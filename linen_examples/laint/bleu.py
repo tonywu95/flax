@@ -190,10 +190,11 @@ def complete_bleu(matches_by_order,
         precisions[i] = 1.0 / (smooth * possible_matches_by_order[i])
     else:
       precisions[i] = 0.0
-
   if max(precisions) > 0:
     p_log_sum = sum(math.log(p) for p in precisions if p)
     geo_mean = math.exp(p_log_sum / max_order)
+  else:
+    geo_mean = 0.0
 
   if use_bp:
     if not reference_length:

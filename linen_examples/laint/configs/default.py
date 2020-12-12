@@ -47,7 +47,7 @@ def get_config():
   config.beam_size = 4
 
   # Frequency of eval during training, e.g. every 1000 steps.
-  config.eval_frequency = 1000
+  config.eval_frequency = 100
 
   # Number of train steps.
   config.num_train_steps = 500_000
@@ -77,7 +77,7 @@ def get_config():
   config.max_predict_length = 256
 
   # whether use latent decoder
-  config.latent = True
+  config.latent = False 
 
   # Inputs and targets share embedding.
   config.share_embeddings = True
@@ -118,6 +118,6 @@ def get_config():
   config.seed = 0
 
   # Debug mode
-  config.debug = True
+  config.debug = True 
 
   return config

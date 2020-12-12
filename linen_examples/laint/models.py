@@ -388,7 +388,6 @@ class Encoder(nn.Module):
     """
     cfg = self.config
     assert inputs.ndim == 2  # (batch, len)
-
     # Input Embedding
     if self.shared_embedding is None:
       input_embed = nn.Embed(
