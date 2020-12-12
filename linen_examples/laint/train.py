@@ -43,6 +43,7 @@ import bleu
 import decode
 import input_pipeline
 import models
+import copy
 # from jax.config import config
 # config.update('jax_disable_jit', True)
 
@@ -203,7 +204,8 @@ def train_step(optimizer,
    inputs_positions, targets_positions,
    inputs_segmentation, targets_segmentation) = [
        batch.get(k, None) for k in train_keys]
-
+  teacher_forcing_targets = copy.deepcopy(targets)[:, :-1]
+  targets = targets[:, 1:]
   weights = jnp.where(targets > 0, 1, 0).astype(jnp.float32)
 
   # We handle PRNG splitting inside the top pmap to improve efficiency.
@@ -214,11 +216,11 @@ def train_step(optimizer,
     logits = models.Transformer(config).apply(
         {"params": params},
         inputs,
-        targets,
-        inputs_positions=inputs_positions,
-        targets_positions=targets_positions,
-        inputs_segmentation=inputs_segmentation,
-        targets_segmentation=targets_segmentation,
+        teacher_forcing_targets,
+        inputs_positions=None,
+        targets_positions=None,
+        inputs_segmentation=None,
+        targets_segmentation=None,
         rngs={"dropout": dropout_rng})
 
     loss, weight_sum = compute_weighted_cross_entropy(
