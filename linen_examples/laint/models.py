@@ -330,6 +330,11 @@ class Decoder1DBlock(nn.Module):
       output after transformer encoder-decoder block.
     """
     cfg = self.config
+    # use the hidden state of <s> token for representing the entire sequence
+    encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
+    # concat with targets
+    targets = jnp.hstack([encoded_compressed, targets])
+
 
     # Decoder block.
     assert targets.ndim == 3
@@ -455,8 +460,8 @@ class Decoder(nn.Module):
       output_embed = self.shared_embedding
 
     y = targets.astype('int32')
-    if not cfg.decode:
-      y = shift_right(y)
+    # if not cfg.decode:
+    #   y = shift_right(y)
     y = output_embed(y)
     y = AddPositionEmbs(config=cfg, decode=cfg.decode, name='posembed_output')(
         y, inputs_positions=targets_positions)
@@ -615,7 +620,6 @@ class Transformer(nn.Module):
       encoded feature array from the transformer encoder.
     """
     cfg = self.config
-    import pdb;pdb.set_trace()
     # Make padding attention mask.
     encoder_mask = nn.make_attention_mask(
         inputs > 0, inputs > 0, dtype=cfg.dtype)
