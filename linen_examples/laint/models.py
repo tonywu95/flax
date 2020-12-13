@@ -534,8 +534,6 @@ class LatentDecoder(nn.Module):
       output_embed = self.shared_embedding
 
     y = targets.astype('int32')
-    if not cfg.decode:
-      y = shift_right(y)
     y = output_embed(y)
     y = AddPositionEmbs(config=cfg, decode=cfg.decode, name='posembed_output')(
         y, inputs_positions=targets_positions)
@@ -543,7 +541,6 @@ class LatentDecoder(nn.Module):
         y, deterministic=cfg.deterministic)
 
     y = y.astype(cfg.dtype)
-
     # use the hidden state of <s> token for representing the entire sequence
     encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
     # concat with targets
@@ -659,8 +656,9 @@ class Transformer(nn.Module):
     """
     cfg = self.config
 
-    if cfg.latent:
+    if cfg.latent: 
       targets_copy = targets
+    if cfg.latent and not cfg.decode: 
       targets = jnp.pad(targets, [(0, 0), (cfg.num_latent_tokens, 0)],
                         mode='constant', constant_values=targets.dtype.type(1))
 
@@ -698,6 +696,7 @@ class Transformer(nn.Module):
             targets_copy,
             targets_positions=targets_positions,
             decoder_mask=decoder_mask)
+      logits = logits[:, cfg.num_latent_tokens:, :]
     else:
       logits = self.decoder(
             encoded,
