@@ -22,32 +22,29 @@ def get_config():
   config = ml_collections.ConfigDict()
 
   # Path to load or store sentencepiece vocab file.
-  config.vocab_path = None
+  config.vocab_path = "/checkpoint/ywu/data/preprocess_scripts/lean_gptf_sp_models/model_4000_bpe.model" 
 
-  config.data_dir = "copy_data"
+  config.data_dir = "/checkpoint/ywu/data/ITP_DATA/lean_novel_lemma"
 
   # Vocabulary size if `vocab_path` is not given.
-  config.vocab_size = 30 
+  config.vocab_size = 4000 
 
-  config.max_corpus_chars = 10000 
-
-  # Name of TFDS translation dataset to use.
-  config.dataset_name = "wmt17_translate/de-en"
-
-  # Optional name of TFDS translation dataset to use for evaluation.
-  config.eval_dataset_name = "wmt14_translate/de-en:test"
+  config.max_corpus_chars = 10**7
 
   # Reverse the direction of translation.
   config.reverse_translation = False
 
   # Per host batch size for training.
-  config.batch_size = 16
+  config.batch_size = 128 
+
+  # Per host batch size for training.
+  config.bucket_length = 256 
 
   # Beam size for inference.
-  config.beam_size = 4
+  config.beam_size = 5 
 
   # Frequency of eval during training, e.g. every 1000 steps.
-  config.eval_frequency = 100
+  config.eval_frequency = 1000
 
   # Number of train steps.
   config.num_train_steps = 500_000
@@ -58,10 +55,10 @@ def get_config():
   config.num_predict_steps = -1
 
   # Base learning rate.
-  config.learning_rate = 0.0625
+  config.learning_rate = 0.0005
 
   # Linear learning rate warmup.
-  config.warmup_steps = 1000
+  config.warmup_steps = 4000
 
   # Cross entropy loss label smoothing.
   config.label_smoothing = 0.1
@@ -70,14 +67,14 @@ def get_config():
   config.weight_decay = 0.0
 
   # Maximum length cutoff for training examples.
-  config.max_target_length = 256
+  config.max_target_length = 512 
   # Maximum length cutoff for eval examples.
-  config.max_eval_target_length = 256
+  config.max_eval_target_length = 512 
   # Maximum length cutoff for predicted tokens.
-  config.max_predict_length = 256
+  config.max_predict_length = 512 
 
   # whether use latent decoder
-  config.latent = True
+  config.latent = False 
 
   config.num_latent_tokens = 1
 
@@ -88,17 +85,17 @@ def get_config():
   config.logits_via_embedding = True
 
   # Number of transformer layers.
-  config.num_layers = 2 
+  config.num_layers = 6 
 
   # Size of query/key/value for attention.
-  config.qkv_dim = 32 
+  config.qkv_dim = 512 
   # Size of embeddings.
-  config.emb_dim = 32 
+  config.emb_dim = 512 
   # Size of the MLP.
-  config.mlp_dim = 64 
+  config.mlp_dim = 2048  
 
   # Number of attention heads.
-  config.num_heads = 2 
+  config.num_heads = 8 
 
   # Dropout rate.
   config.dropout_rate = 0.1
@@ -111,7 +108,7 @@ def get_config():
   # Whether to restore from existing model checkpoints.
   config.restore_checkpoints = True
   # Save a checkpoint every these number of steps.
-  config.checkpoint_freq = 10000
+  config.checkpoint_freq = 3000
 
   # Use bfloat16 mixed precision training instead of float32.
   config.use_bfloat16 = True

@@ -34,8 +34,6 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 # Raw TFDS dataset.
 # -----------------------------------------------------------------------------
 def raw_wmt_datasets(data_dir=".",
-                     eval_dataset_name=None,
-                     reverse_translation=False,
                      shard_idx=0,
                      shard_count=1):
   """Load raw WMT datasets and normalize feature keys.
@@ -88,7 +86,7 @@ def raw_wmt_datasets(data_dir=".",
   def load_data(name):
     src_data = tf.data.TextLineDataset(osp.join(data_dir, "{}.src".format(name)))
     tgt_data = tf.data.TextLineDataset(osp.join(data_dir, "{}.tgt".format(name)))
-    zip_data = tf.data.Dataset.zip((src_data, tgt_data))
+    zip_data = tf.data.Dataset.zip((src_data, tgt_data)).shard(shard_count, shard_idx)
     return zip_data
   raw_train = load_data("train")
   raw_valid = load_data("valid")
@@ -453,7 +451,7 @@ def preprocess_wmt_data(dataset,
                         shuffle_buffer_size=1024,
                         max_length=512,
                         batch_size=256,
-                        bucket_length=32,
+                        bucket_length=256,
                         drop_remainder=True,
                         prefetch_size=AUTOTUNE):
   """Shuffle and batch/pack the given dataset."""
@@ -498,18 +496,19 @@ def preprocess_wmt_data(dataset,
   return dataset
 
 
-def get_wmt_datasets(n_devices,
-                     data_dir='wmt17_translate/de-en',
-                     eval_dataset_name=None,
-                     vocab_path=None,
-                     target_vocab_size=30,  # 32000
-                     max_corpus_chars=10000,
-                     batch_size=256,
-                     bucket_length=32,
-                     dynamic_batching=True,
-                     pack_examples=False,
-                     max_length=256,
-                     max_eval_length=256):
+def get_datasets(n_devices,
+                 data_dir='wmt17_translate/de-en',
+                 shard_idx=0,
+                 shard_count=1,
+                 vocab_path=None,
+                 target_vocab_size=30,  # 32000
+                 max_corpus_chars=10000,
+                 batch_size=256,
+                 bucket_length=256,
+                 dynamic_batching=True,
+                 pack_examples=False,
+                 max_length=256,
+                 max_eval_length=256):
   """Load and return dataset of batched examples for use during training."""
   if batch_size % n_devices:
     raise ValueError("Batch size %d isn't divided evenly by n_devices %d" %
@@ -518,8 +517,7 @@ def get_wmt_datasets(n_devices,
     vocab_path = os.path.expanduser('~/wmt_sentencepiece_model')
 
   train_data, eval_data = raw_wmt_datasets(
-      data_dir=data_dir,
-      eval_dataset_name=eval_dataset_name)
+      data_dir=data_dir, shard_idx=shard_idx, shard_count=shard_count)
 
   try:
     sp_tokenizer = load_sentencepiece_tokenizer(vocab_path, add_bos=True, add_eos=True)

@@ -374,12 +374,15 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
   # Load Dataset
   # ---------------------------------------------------------------------------
   logging.info("Initializing dataset.")
-  train_ds, eval_ds, predict_ds, encoder = input_pipeline.get_wmt_datasets(
+  train_ds, eval_ds, predict_ds, encoder = input_pipeline.get_datasets(
       n_devices=n_devices,
       data_dir=config.data_dir,
-      eval_dataset_name=config.eval_dataset_name,
+      shard_idx=jax.host_id(),
+      shard_count=jax.host_count(),
+      vocab_path=config.vocab_path,
       target_vocab_size=config.vocab_size,
       batch_size=config.batch_size,
+      bucket_length=config.bucket_length,
       max_corpus_chars=config.max_corpus_chars,
       max_length=config.max_target_length,
       max_eval_length=config.max_eval_target_length)
