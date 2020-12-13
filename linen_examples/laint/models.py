@@ -464,6 +464,8 @@ class Decoder(nn.Module):
         y, deterministic=cfg.deterministic)
 
     y = y.astype(cfg.dtype)
+    if cfg.latent:
+      encoded = jnp.expand_dims(encoded[:, 0, :], 1)
 
     # Target-Input Decoder
     for lyr in range(cfg.num_layers):
@@ -474,89 +476,6 @@ class Decoder(nn.Module):
               decoder_mask=decoder_mask,
               encoder_decoder_mask=encoder_decoder_mask)
     y = nn.LayerNorm(dtype=cfg.dtype, name='encoderdecoder_norm')(y)
-
-    # Decoded Logits
-    if cfg.logits_via_embedding:
-      # Use the transpose of embedding matrix for logit transform.
-      logits = output_embed.attend(y.astype(jnp.float32))
-      # Correctly normalize pre-softmax logits for this shared case.
-      logits = logits / jnp.sqrt(y.shape[-1])
-    else:
-      logits = nn.Dense(
-          cfg.output_vocab_size,
-          dtype=cfg.dtype,
-          kernel_init=cfg.kernel_init,
-          bias_init=cfg.bias_init,
-          name='logitdense')(y)
-    return logits
-
-
-class LatentDecoder(nn.Module):
-  """Transformer Model Decoder for sequence to sequence translation.
-
-  Args:
-    config: TransformerConfig dataclass containing hyperparameters.
-    shared_embedding: a shared embedding layer to use.
-  """
-  config: TransformerConfig
-  shared_embedding: Any = None
-
-  @nn.compact
-  def __call__(self,
-               encoded,
-               targets,
-               targets_positions=None,
-               decoder_mask=None):
-    """Applies Transformer model on the inputs.
-
-    Args:
-      encoded: encoded input data from encoder.
-      targets: target inputs.
-      targets_positions: input subsequence positions for packed examples.
-      decoder_mask: decoder self-attention mask.
-      encoder_decoder_mask: encoder-decoder attention mask.
-
-    Returns:
-      output of a transformer decoder.
-    """
-    cfg = self.config
-
-    assert encoded.ndim == 3  # (batch, len, depth)
-    assert targets.ndim == 2  # (batch, len)
-
-    # Target Embedding
-    if self.shared_embedding is None:
-      output_embed = nn.Embed(
-          num_embeddings=cfg.output_vocab_size,
-          features=cfg.emb_dim,
-          embedding_init=nn.initializers.normal(stddev=1.0))
-    else:
-      output_embed = self.shared_embedding
-
-    y = targets.astype('int32')
-    if not cfg.decode:
-      y = shift_right(y)
-    y = output_embed(y)
-    y = AddPositionEmbs(config=cfg, decode=cfg.decode, name='posembed_output')(
-        y, inputs_positions=targets_positions)
-    y = nn.Dropout(rate=cfg.dropout_rate)(
-        y, deterministic=cfg.deterministic)
-
-    y = y.astype(cfg.dtype)
-
-    # use the hidden state of <s> token for representing the entire sequence
-    encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
-    # concat with targets
-    y = jnp.hstack([encoded_compressed, y])
-
-    # Target-Input Decoder
-    for lyr in range(cfg.num_layers):
-      y = Decoder1DBlock(
-          config=cfg, name=f'decoderblock_{lyr}')(
-              y,
-              encoded,
-              decoder_mask=decoder_mask)
-    y = nn.LayerNorm(dtype=cfg.dtype, name='decoder_norm')(y)
 
     # Decoded Logits
     if cfg.logits_via_embedding:
@@ -598,12 +517,8 @@ class Transformer(nn.Module):
 
     self.encoder = Encoder(config=cfg,
                            shared_embedding=self.shared_embedding)
-    if cfg.latent:
-        self.decoder = LatentDecoder(config=cfg,
-                                     shared_embedding=self.shared_embedding)
-    else:
-        self.decoder = Decoder(config=cfg,
-                               shared_embedding=self.shared_embedding)
+    self.decoder = Decoder(config=cfg,
+                           shared_embedding=self.shared_embedding)
 
   def encode(self,
              inputs,
@@ -660,9 +575,7 @@ class Transformer(nn.Module):
     cfg = self.config
 
     if cfg.latent:
-      targets_copy = targets
-      targets = jnp.pad(targets, [(0, 0), (cfg.num_latent_tokens, 0)],
-                        mode='constant', constant_values=targets.dtype.type(1))
+      inputs = jnp.ones_like(inputs[:, :cfg.num_latent_tokens])
 
     # Make padding attention masks.
     if cfg.decode:
@@ -691,20 +604,12 @@ class Transformer(nn.Module):
                                  inputs_segmentation,
                                  jnp.equal,
                                  dtype=cfg.dtype))
-    if cfg.latent:
-      assert targets_positions is None
-      logits = self.decoder(
-            encoded,
-            targets_copy,
-            targets_positions=targets_positions,
-            decoder_mask=decoder_mask)
-    else:
-      logits = self.decoder(
-            encoded,
-            targets,
-            targets_positions=targets_positions,
-            decoder_mask=decoder_mask,
-            encoder_decoder_mask=encoder_decoder_mask)
+    logits = self.decoder(
+        encoded,
+        targets,
+        targets_positions=targets_positions,
+        decoder_mask=decoder_mask,
+        encoder_decoder_mask=encoder_decoder_mask)
     return logits.astype(self.config.dtype)
 
   def __call__(self,
