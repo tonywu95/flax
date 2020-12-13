@@ -24,6 +24,8 @@ import numpy as np
 # Constants
 # We assume the default End-of-Sentence token id is 2 (SentencePiece).
 EOS_ID = 2
+# We assume the default Begin-of-Sentence token id is 1 (SentencePiece).
+BOS_ID = 1 
 # "Effective negative infinity" constant for masking in beam search.
 NEG_INF = np.array(-1.0e7)
 
@@ -145,10 +147,10 @@ def beam_init(batch_size, beam_size, max_decode_len, cache):
       jnp.array([0.0] + [NEG_INF] * (beam_size - 1)),
       [batch_size, 1])
   finished_scores0 = jnp.ones((batch_size, beam_size)) * NEG_INF
-  live_seqs0 = jnp.zeros(
-      (batch_size, beam_size, max_decode_len), jnp.int32)
-  finished_seqs0 = jnp.zeros(
-      (batch_size, beam_size, max_decode_len), jnp.int32)
+  live_seqs0 = jnp.ones(
+      (batch_size, beam_size, max_decode_len), jnp.int32) * BOS_ID 
+  finished_seqs0 = jnp.ones(
+      (batch_size, beam_size, max_decode_len), jnp.int32) * BOS_ID 
   finished_flags0 = jnp.zeros((batch_size, beam_size), jnp.bool_)
   # add beam dimension to attention cache pytree elements
   beam_cache0 = jax.tree_map(lambda x: add_beam_dim(x, beam_size), cache)
@@ -360,5 +362,4 @@ def beam_search(inputs,
   finished_scores = jnp.where(none_finished[:, None],
                               final_state.finished_scores,
                               final_state.live_logprobs)
-
   return finished_seqs, finished_scores

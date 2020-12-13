@@ -44,8 +44,6 @@ import decode
 import input_pipeline
 import models
 import copy
-# from jax.config import config
-# config.update('jax_disable_jit', True)
 
 def create_learning_rate_scheduler(
     factors="constant * linear_warmup * rsqrt_decay",
@@ -259,6 +257,7 @@ def initialize_cache(inputs, max_decode_len, config):
   return initial_variables["cache"]
 
 
+#def predict_step(inputs, params, cache, config, eos_id=2, max_decode_len=128, 
 def predict_step(inputs, params, cache, eos_id, max_decode_len, config,
                  beam_size=4):
   """Predict translation with fast decoding beam search on a batch."""
@@ -353,6 +352,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
 
   # Number of local devices for this host.
   n_devices = jax.local_device_count()
+  if config.debug:
+    from jax.config import config as jax_config
+    jax_config.update('jax_disable_jit', True)
 
   if jax.host_id() == 0:
     tf.io.gfile.makedirs(workdir)
@@ -460,6 +462,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
           learning_rate_fn=learning_rate_fn,
           label_smoothing=config.label_smoothing),
         axis_name="batch")
+    p_init_cache = jax.vmap(
+        functools.partial(
+          initialize_cache,
+          max_decode_len=config.max_predict_length,
+          config=predict_config),
+        axis_name="batch")
+    p_pred_step = jax.vmap(
+        functools.partial(
+          predict_step, config=predict_config, beam_size=config.beam_size),
+        axis_name="batch")
+
   else:
     p_train_step = jax.pmap(
         functools.partial(
@@ -469,23 +482,24 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
           label_smoothing=config.label_smoothing),
         axis_name="batch",
         donate_argnums=(0,))  # pytype: disable=wrong-arg-types
+    p_init_cache = jax.pmap(
+        functools.partial(
+          initialize_cache,
+          max_decode_len=config.max_predict_length,
+          config=predict_config),
+        axis_name="batch")
+    p_pred_step = jax.pmap(
+        functools.partial(
+          predict_step, config=predict_config, beam_size=config.beam_size),
+        axis_name="batch",
+        static_broadcasted_argnums=(3, 4))  # eos token, max_length are constant
+
   p_eval_step = jax.pmap(
       functools.partial(
           eval_step, config=eval_config,
           label_smoothing=config.label_smoothing),
       axis_name="batch")
-  p_init_cache = jax.pmap(
-      functools.partial(
-          initialize_cache,
-          max_decode_len=config.max_predict_length,
-          config=predict_config),
-      axis_name="batch")
-  p_pred_step = jax.pmap(
-      functools.partial(
-          predict_step, config=predict_config, beam_size=config.beam_size),
-      axis_name="batch",
-      static_broadcasted_argnums=(3, 4))  # eos token, max_length are constant
-
+  
   # Main Train Loop
   # ---------------------------------------------------------------------------
 
@@ -513,7 +527,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
                                   step)
 
     # Periodic metric handling.
-    if step % config.eval_frequency != 0 and step > 0:
+    if step % config.eval_frequency != 0 and step > 0 and not config.debug:
       continue
 
     # Training Metrics
@@ -573,8 +587,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             lambda x: pad_examples(x, padded_size), pred_batch)  # pylint: disable=cell-var-from-loop
       pred_batch = common_utils.shard(pred_batch)
       cache = p_init_cache(pred_batch["inputs"])
-      predicted = p_pred_step(pred_batch["inputs"], optimizer.target, cache,
-                              eos_id, config.max_predict_length)
+      if config.debug:
+        predicted = p_pred_step(pred_batch["inputs"], optimizer.target, cache)
+      else:
+        predicted = p_pred_step(pred_batch["inputs"], optimizer.target, cache,
+                                eos_id, config.max_predict_length)
       predicted = tohost(predicted)
       inputs = tohost(pred_batch["inputs"])
       targets = tohost(pred_batch["targets"])
@@ -583,6 +600,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         sources.append(decode_tokens(inputs[i]))
         references.append(decode_tokens(targets[i]))
         predictions.append(decode_tokens(s))
+    print("Source : {}".format(sources[0]))
+    print("Target : {}".format(references[0]))
+    print("Hypothesis : {}".format(predictions[0]))
     logging.info("Translation: %d predictions %d references %d sources.",
                  len(predictions), len(references), len(sources))
     logging.info("Translation time: %.4f s step %d.",

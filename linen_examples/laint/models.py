@@ -331,9 +331,9 @@ class Decoder1DBlock(nn.Module):
     """
     cfg = self.config
     # use the hidden state of <s> token for representing the entire sequence
-    encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
+    #encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
     # concat with targets
-    targets = jnp.hstack([encoded_compressed, targets])
+    #targets = jnp.hstack([encoded_compressed, targets])
 
 
     # Decoder block.
