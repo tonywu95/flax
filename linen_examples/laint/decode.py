@@ -242,7 +242,7 @@ def beam_search(inputs,
 
     # Call fast-decoder model on current tokens to get next-position logits.
     # --> [batch * beam, vocab]
-    flat_logits, new_flat_cache = tokens_to_logits(flat_ids, flat_cache)
+    flat_logits, new_flat_cache = tokens_to_logits(flat_ids, flat_cache, state.cur_index)
 
     # unflatten beam dimension
     # [batch * beam, vocab] --> [batch, beam, vocab]

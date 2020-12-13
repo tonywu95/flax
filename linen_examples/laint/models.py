@@ -139,6 +139,7 @@ class AddPositionEmbs(nn.Module):
 
     # We use a cache position index for tracking decoding position.
     if self.decode:
+      import pdb;pdb.set_trace()
       is_initialized = self.has_variable('cache', 'cache_index')
       cache_index = self.variable('cache', 'cache_index',
                                   lambda: jnp.array(0, dtype=jnp.uint32))
@@ -505,6 +506,7 @@ class LatentDecoder(nn.Module):
   def __call__(self,
                encoded,
                targets,
+               index=None,
                targets_positions=None,
                decoder_mask=None):
     """Applies Transformer model on the inputs.
@@ -541,10 +543,11 @@ class LatentDecoder(nn.Module):
         y, deterministic=cfg.deterministic)
 
     y = y.astype(cfg.dtype)
-    # use the hidden state of <s> token for representing the entire sequence
-    encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
-    # concat with targets
-    y = jnp.hstack([encoded_compressed, y])
+    if index == 0:
+      # use the hidden state of <s> token for representing the entire sequence
+      encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
+      # concat with targets
+      y = jnp.hstack([encoded_compressed, y])
 
     # Target-Input Decoder
     for lyr in range(cfg.num_layers):
@@ -638,6 +641,7 @@ class Transformer(nn.Module):
              encoded,
              inputs,  # only needed for masks
              targets,
+             index=None,
              targets_positions=None,
              inputs_segmentation=None,
              targets_segmentation=None):
@@ -661,7 +665,6 @@ class Transformer(nn.Module):
     if cfg.latent and not cfg.decode: 
       targets = jnp.pad(targets, [(0, 0), (cfg.num_latent_tokens, 0)],
                         mode='constant', constant_values=targets.dtype.type(1))
-
     # Make padding attention masks.
     if cfg.decode:
       # for fast autoregressive decoding only a special encoder-decoder mask is used
@@ -696,7 +699,8 @@ class Transformer(nn.Module):
             targets_copy,
             targets_positions=targets_positions,
             decoder_mask=decoder_mask)
-      logits = logits[:, cfg.num_latent_tokens:, :]
+      if not cfg.decode:
+        logits = logits[:, cfg.num_latent_tokens:, :]
     else:
       logits = self.decoder(
             encoded,

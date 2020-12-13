@@ -206,6 +206,7 @@ class MultiHeadDotProductAttention(Module):
             cached_key.value.shape)
         # shape check of cached keys against query input
         expected_shape = tuple(batch_dims) + (1, num_heads, depth_per_head)
+        import pdb;pdb.set_trace()
         if expected_shape != query.shape:
           raise ValueError('Autoregressive cache shape error, '
                            'expected query shape %s instead got %s.' %

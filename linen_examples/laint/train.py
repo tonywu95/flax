@@ -274,7 +274,7 @@ def predict_step(inputs, params, cache, eos_id, max_decode_len, config,
       beam_size)
   raw_inputs = decode.flat_batch_beam_expand(inputs, beam_size)
 
-  def tokens_ids_to_logits(flat_ids, flat_cache):
+  def tokens_ids_to_logits(flat_ids, flat_cache, index):
     """Token slice to logits from decoder model."""
     # --> [batch * beam, 1, vocab]
     flat_logits, new_vars = models.Transformer(config).apply(
@@ -285,6 +285,7 @@ def predict_step(inputs, params, cache, eos_id, max_decode_len, config,
         encoded_inputs,
         raw_inputs,  # only needed for input padding mask
         flat_ids,
+        index,
         mutable=["cache"],
         method=models.Transformer.decode)
     new_flat_cache = new_vars["cache"]
