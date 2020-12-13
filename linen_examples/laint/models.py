@@ -49,6 +49,7 @@ class TransformerConfig:
   deterministic: bool = False
   decode: bool = False
   latent: bool = False
+  num_latent_tokens: int = 0
   kernel_init: Callable = nn.initializers.xavier_uniform()
   bias_init: Callable = nn.initializers.normal(stddev=1e-6)
   posemb_init: Optional[Callable] = None
@@ -330,11 +331,6 @@ class Decoder1DBlock(nn.Module):
       output after transformer encoder-decoder block.
     """
     cfg = self.config
-    # use the hidden state of <s> token for representing the entire sequence
-    #encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
-    # concat with targets
-    #targets = jnp.hstack([encoded_compressed, targets])
-
 
     # Decoder block.
     assert targets.ndim == 3
@@ -548,6 +544,11 @@ class LatentDecoder(nn.Module):
 
     y = y.astype(cfg.dtype)
 
+    # use the hidden state of <s> token for representing the entire sequence
+    encoded_compressed = jnp.expand_dims(encoded[:, 0, :], 1)
+    # concat with targets
+    y = jnp.hstack([encoded_compressed, y])
+
     # Target-Input Decoder
     for lyr in range(cfg.num_layers):
       y = Decoder1DBlock(
@@ -658,6 +659,11 @@ class Transformer(nn.Module):
     """
     cfg = self.config
 
+    if cfg.latent:
+      targets_copy = targets
+      targets = jnp.pad(targets, [(0, 0), (cfg.num_latent_tokens, 0)],
+                        mode='constant', constant_values=targets.dtype.type(1))
+
     # Make padding attention masks.
     if cfg.decode:
       # for fast autoregressive decoding only a special encoder-decoder mask is used
@@ -686,9 +692,10 @@ class Transformer(nn.Module):
                                  jnp.equal,
                                  dtype=cfg.dtype))
     if cfg.latent:
+      assert targets_positions is None
       logits = self.decoder(
             encoded,
-            targets,
+            targets_copy,
             targets_positions=targets_positions,
             decoder_mask=decoder_mask)
     else:

@@ -77,7 +77,9 @@ def get_config():
   config.max_predict_length = 256
 
   # whether use latent decoder
-  config.latent = False 
+  config.latent = True
+
+  config.num_latent_tokens = 1
 
   # Inputs and targets share embedding.
   config.share_embeddings = True
@@ -118,6 +120,6 @@ def get_config():
   config.seed = 0
 
   # Debug mode
-  config.debug = True 
+  config.debug = False 
 
   return config

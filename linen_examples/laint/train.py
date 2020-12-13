@@ -399,6 +399,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
   # ---------------------------------------------------------------------------
   train_config = models.TransformerConfig(
       latent=config.latent,
+      num_latent_tokens=config.num_latent_tokens,
       vocab_size=vocab_size,
       output_vocab_size=vocab_size,
       share_embeddings=config.share_embeddings,
