@@ -47,7 +47,7 @@ def get_config():
   config.beam_size = 4
 
   # Frequency of eval during training, e.g. every 1000 steps.
-  config.eval_frequency = 100
+  config.eval_frequency = 1000
 
   # Number of train steps.
   config.num_train_steps = 500_000
@@ -58,7 +58,7 @@ def get_config():
   config.num_predict_steps = -1
 
   # Base learning rate.
-  config.learning_rate = 0.0625
+  config.learning_rate = 0.00625
 
   # Linear learning rate warmup.
   config.warmup_steps = 1000
@@ -120,6 +120,6 @@ def get_config():
   config.seed = 0
 
   # Debug mode
-  config.debug = False 
+  config.debug = True 
 
   return config

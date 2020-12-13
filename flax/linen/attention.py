@@ -206,13 +206,16 @@ class MultiHeadDotProductAttention(Module):
             cached_key.value.shape)
         # shape check of cached keys against query input
         expected_shape = tuple(batch_dims) + (1, num_heads, depth_per_head)
-        import pdb;pdb.set_trace()
-        if expected_shape != query.shape:
-          raise ValueError('Autoregressive cache shape error, '
-                           'expected query shape %s instead got %s.' %
-                           (expected_shape, query.shape))
+        #if expected_shape != query.shape:
+        #  raise ValueError('Autoregressive cache shape error, '
+        #                   'expected query shape %s instead got %s.' %
+        #                   (expected_shape, query.shape))
         # update key, value caches with our new 1d spatial slices
-        cur_index = cache_index.value
+        #cur_index = cache_index.value
+        cur_index = lax.cond(cache_index.value>0,
+                             lambda _: cache_index.value + 1,
+                             lambda _: 0,
+                             operand=None)
         indices = (0,) * len(batch_dims) + (cur_index, 0, 0)
         key = lax.dynamic_update_slice(cached_key.value, key, indices)
         value = lax.dynamic_update_slice(cached_value.value, value, indices)

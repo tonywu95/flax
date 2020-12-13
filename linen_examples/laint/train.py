@@ -257,8 +257,8 @@ def initialize_cache(inputs, max_decode_len, config):
   return initial_variables["cache"]
 
 
-#def predict_step(inputs, params, cache, config, eos_id=2, max_decode_len=128, 
-def predict_step(inputs, params, cache, eos_id, max_decode_len, config,
+def predict_step(inputs, params, cache, config, eos_id=2, max_decode_len=128, 
+#def predict_step(inputs, params, cache, eos_id, max_decode_len, config,
                  beam_size=4):
   """Predict translation with fast decoding beam search on a batch."""
   # Prepare transformer fast-decoder call for beam search: for beam search, we
@@ -274,7 +274,7 @@ def predict_step(inputs, params, cache, eos_id, max_decode_len, config,
       beam_size)
   raw_inputs = decode.flat_batch_beam_expand(inputs, beam_size)
 
-  def tokens_ids_to_logits(flat_ids, flat_cache, index):
+  def tokens_ids_to_logits(flat_ids, flat_cache):
     """Token slice to logits from decoder model."""
     # --> [batch * beam, 1, vocab]
     flat_logits, new_vars = models.Transformer(config).apply(
@@ -285,7 +285,6 @@ def predict_step(inputs, params, cache, eos_id, max_decode_len, config,
         encoded_inputs,
         raw_inputs,  # only needed for input padding mask
         flat_ids,
-        index,
         mutable=["cache"],
         method=models.Transformer.decode)
     new_flat_cache = new_vars["cache"]
