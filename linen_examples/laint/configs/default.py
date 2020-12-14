@@ -47,7 +47,7 @@ def get_config():
   config.eval_frequency = 1000
 
   # Number of train steps.
-  config.num_train_steps = 500_000
+  config.num_train_steps = 200_000
   # Number of steps to take during evaluation.
   config.num_eval_steps = 20
   # Number of steps to generate predictions (used for BLEU score).

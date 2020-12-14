@@ -340,7 +340,7 @@ def tohost(x):
   return np.array(x).reshape((n_device * n_batch,) + tuple(remaining_dims))
 
 
-def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
+def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str, ckptdir: str):
   """Runs a training and evaluation loop.
 
   Args:
@@ -349,6 +349,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
       contains checkpoint training will be resumed from the latest checkpoint.
   """
   tf.io.gfile.makedirs(workdir)
+  print(config)
 
   # Number of local devices for this host.
   n_devices = jax.local_device_count()
@@ -362,6 +363,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
         os.path.join(workdir, "train"))
     eval_summary_writer = tensorboard.SummaryWriter(
         os.path.join(workdir, "eval"))
+    train_summary_writer.text("config_info", str(config), 0)
+    train_summary_writer.text("ckptdir", ckptdir, 0)
 
   if config.batch_size % n_devices:
     raise ValueError("Batch size must be divisible by the number of devices")
@@ -447,7 +450,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
 
   if config.restore_checkpoints:
     # Restore unreplicated optimizer + model state from last checkpoint.
-    optimizer = checkpoints.restore_checkpoint(workdir, optimizer)
+    optimizer = checkpoints.restore_checkpoint(ckptdir, optimizer)
     # Grab last step.
     start_step = int(optimizer.state.step)
 
@@ -527,7 +530,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     # Save a checkpoint on one host after every checkpoint_freq steps.
     if (config.save_checkpoints and step % config.checkpoint_freq == 0 and
         step > 0 and jax.host_id() == 0):
-      checkpoints.save_checkpoint(workdir, jax_utils.unreplicate(optimizer),
+      checkpoints.save_checkpoint(ckptdir, jax_utils.unreplicate(optimizer),
                                   step)
 
     # Periodic metric handling.

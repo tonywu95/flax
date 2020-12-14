@@ -27,7 +27,7 @@ parser.add_argument('--qos-type', '-qt', type=str, default='normal',
     help='The resource type')
 parser.add_argument('--memory', '-mem', type=int, default=120,
     help='The size of memory to be used')
-parser.add_argument('--num-gpus', '-ng', type=int, default=1,
+parser.add_argument('--num-gpus', '-ng', type=int, default=4,
     help='The number of gpus to be used')
 parser.add_argument('--num-cpus', '-nc', type=int, default=16,
     help='The number of cpus to be used')
@@ -56,12 +56,27 @@ def write_cmds(f, cmds):
     f.write(')\n')
     f.write('${list[SLURM_ARRAY_TASK_ID]}')
     # NOTE: comment this one to use self-managed dir for checkpoints
-    f.write(' --workdir /checkpoint/${SLURM_JOB_USER}/${SLURM_JOB_ID}\n')
+    f.write(' --ckptdir /checkpoint/${SLURM_JOB_USER}/${SLURM_JOB_ID}\n')
 
 def main():
     cmds = []
+    data_dir = "/checkpoint/ywu/data/ITP_DATA/lean_novel_lemma"
+    vocab_path = "/checkpoint/ywu/data/preprocess_scripts/lean_gptf_sp_models/model_4000_bpe.model" 
+    for bs in [256]:
+        for lr in args.lrs:
+            for bl in [128]:
+                for latent in [True, False]:
+                    workdir = "{}/bs{}_lr{}_latent{}".format(args.dump_dir, bs, lr, latent)
+                    cmds.append("python main.py --workdir={} --config=configs/default.py "
+                                "--config.data_dir={} "
+                                "--config.vocab_path={} "
+                                "--config.batch_size={} "
+                                "--config.learning_rate={} "
+                                "--config.bucket_length={} "
+                                "--config.latent={} "
+                                "".format(workdir, data_dir, vocab_path, bs, lr, bl, latent))
     with open(args.output, 'w') as f:
-        write_cmds(f, ['python main.py --config configs/default.py'])
+        write_cmds(f, cmds)
 
 if __name__ == "__main__":
     main()

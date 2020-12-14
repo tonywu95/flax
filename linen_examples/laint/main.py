@@ -33,6 +33,7 @@ FLAGS = flags.FLAGS
 config_flags.DEFINE_config_file(
     "config", None, "Training configuration.", lock_config=True)
 flags.DEFINE_string("workdir", None, "Work unit directory.")
+flags.DEFINE_string("ckptdir", None, "Checkpoint directory.")
 flags.DEFINE_string("jax_backend_target", None,
                     "JAX backend target to use. Can be used with UPTC.")
 flags.mark_flags_as_required(["config", "workdir"])
@@ -61,7 +62,7 @@ def main(argv):
   platform.work_unit().create_artifact(platform.ArtifactType.DIRECTORY,
                                        FLAGS.workdir, "workdir")
 
-  train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
+  train.train_and_evaluate(FLAGS.config, FLAGS.workdir, FLAGS.ckptdir)
 
 
 if __name__ == "__main__":
