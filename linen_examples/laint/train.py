@@ -85,6 +85,7 @@ def create_learning_rate_scheduler(
       elif name == "linear_warmup":
         ret *= jnp.minimum(1.0, step / warmup_steps)
       elif name == "rsqrt_decay":
+        ret *= jnp.sqrt(warmup_steps)
         ret /= jnp.sqrt(jnp.maximum(step, warmup_steps))
       elif name == "rsqrt_normalized_decay":
         ret *= jnp.sqrt(warmup_steps)
@@ -241,8 +242,10 @@ def train_step(optimizer,
 def eval_step(params, batch, config, label_smoothing=0.0):
   """Calculate evaluation metrics on a batch."""
   inputs, targets = batch["inputs"], batch["targets"]
+  teacher_forcing_targets = copy.deepcopy(targets)[:, :-1]
+  targets = targets[:, 1:]
   weights = jnp.where(targets > 0, 1.0, 0.0)
-  logits = models.Transformer(config).apply({"params": params}, inputs, targets)
+  logits = models.Transformer(config).apply({"params": params}, inputs, teacher_forcing_targets)
 
   return compute_metrics(logits, targets, weights, label_smoothing)
 

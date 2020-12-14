@@ -505,7 +505,7 @@ def get_datasets(n_devices,
                  max_corpus_chars=10000,
                  batch_size=256,
                  bucket_length=256,
-                 dynamic_batching=True,
+                 dynamic_batching=False,
                  pack_examples=False,
                  max_length=256,
                  max_eval_length=256):
