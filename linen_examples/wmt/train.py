@@ -85,6 +85,7 @@ def create_learning_rate_scheduler(
       elif name == "linear_warmup":
         ret *= jnp.minimum(1.0, step / warmup_steps)
       elif name == "rsqrt_decay":
+        ret *= jnp.sqrt(warmup_steps)
         ret /= jnp.sqrt(jnp.maximum(step, warmup_steps))
       elif name == "rsqrt_normalized_decay":
         ret *= jnp.sqrt(warmup_steps)
@@ -545,7 +546,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
       for key, val in eval_summary.items():
         eval_summary_writer.scalar(key, val, step)
       eval_summary_writer.flush()
-    logging.info("eval in step: %d, loss: %.4f", step, eval_summary["loss"])
+    logging.info("eval in step: %d, loss: %.4f, acc: %.4f", step, eval_summary["loss"], eval_summary["accuracy"])
     logging.info("eval time: %.4f s step %d", time.time() - t_eval_start, step)
 
     # Translation and BLEU Score.
