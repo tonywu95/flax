@@ -22,7 +22,7 @@ def get_config():
   config = ml_collections.ConfigDict()
 
   # Path to load or store sentencepiece vocab file.
-  config.vocab_path = None
+  config.vocab_path = "lean_novel_lemma/model_4000_bpe.model" 
 
   # Vocabulary size if `vocab_path` is not given.
   config.vocab_size = 32_000
@@ -30,22 +30,22 @@ def get_config():
   config.max_corpus_chars = 10**7
 
   # Name of TFDS translation dataset to use.
-  config.dataset_name = "wmt17_translate/de-en"
+  config.dataset_name = "lean_novel_lemma"
 
   # Optional name of TFDS translation dataset to use for evaluation.
-  config.eval_dataset_name = "wmt14_translate/de-en:test"
+  config.eval_dataset_name = "wmt17_translate/de-en:test"
 
   # Reverse the direction of translation.
   config.reverse_translation = False
 
   # Per host batch size for training.
-  config.batch_size = 256
+  config.batch_size = 256 
 
   # Beam size for inference.
   config.beam_size = 4
 
   # Frequency of eval during training, e.g. every 1000 steps.
-  config.eval_frequency = 1000
+  config.eval_frequency = 3000
 
   # Number of train steps.
   config.num_train_steps = 500_000
@@ -56,7 +56,7 @@ def get_config():
   config.num_predict_steps = -1
 
   # Base learning rate.
-  config.learning_rate = 0.0625
+  config.learning_rate = 0.0003
 
   # Linear learning rate warmup.
   config.warmup_steps = 1000
@@ -68,9 +68,9 @@ def get_config():
   config.weight_decay = 0.0
 
   # Maximum length cutoff for training examples.
-  config.max_target_length = 256
+  config.max_target_length = 256 
   # Maximum length cutoff for eval examples.
-  config.max_eval_target_length = 256
+  config.max_eval_target_length = 256 
   # Maximum length cutoff for predicted tokens.
   config.max_predict_length = 256
 
@@ -84,14 +84,14 @@ def get_config():
   config.num_layers = 6
 
   # Size of query/key/value for attention.
-  config.qkv_dim = 1024
+  config.qkv_dim = 512 
   # Size of embeddings.
-  config.emb_dim = 1024
+  config.emb_dim = 512
   # Size of the MLP.
-  config.mlp_dim = 4096
+  config.mlp_dim = 512
 
   # Number of attention heads.
-  config.num_heads = 16
+  config.num_heads = 8
 
   # Dropout rate.
   config.dropout_rate = 0.1

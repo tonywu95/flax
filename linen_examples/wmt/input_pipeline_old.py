@@ -15,7 +15,6 @@
 """Input pipeline for a WMT dataset."""
 
 import os
-import os.path as osp
 import tempfile
 import time
 from absl import logging
@@ -54,20 +53,43 @@ def raw_wmt_datasets(dataset_name='wmt17_translate/de-en',
     source and target language features are mapped to 'inputs' and 'targets'
     keys.
   """
-  def load_data(name):
-    src_data = tf.data.TextLineDataset(osp.join(dataset_name, "{}.src".format(name)))
-    tgt_data = tf.data.TextLineDataset(osp.join(dataset_name, "{}.tgt".format(name)))
-    zip_data = tf.data.Dataset.zip((src_data, tgt_data)).shard(shard_count, shard_idx)
-    return zip_data
-  raw_train = load_data("train")
-  raw_valid = load_data("valid")
+  builder = tfds.builder(dataset_name)
+  shard_spec = (f'[{int(100 * shard_idx / shard_count)}%'
+                f':{int(100 * (shard_idx + 1) / shard_count)}%]')
+  logging.info('Training on TFDS dataset %s with split %s',
+               dataset_name, 'train' + shard_spec)
+  train_data = builder.as_dataset(split='train' + shard_spec,
+                                  shuffle_files=True)
+  if eval_dataset_name is None:
+    logging.info('Evaluating on TFDS dataset %s with split %s',
+                 dataset_name, 'validation' + shard_spec)
+    eval_data = builder.as_dataset(split='validation' + shard_spec,
+                                   shuffle_files=False)
+  else:
+    eval_dataset, *eval_split = eval_dataset_name.split(':')
+    if not eval_split:
+      eval_split = 'validation'
+    else:
+      eval_split = eval_split[0]
+    logging.info('Evaluating on TFDS dataset %s with split %s',
+                 eval_dataset, eval_split + shard_spec)
+    eval_builder = tfds.builder(eval_dataset)
+    eval_data = eval_builder.as_dataset(split=eval_split + shard_spec,
+                                        shuffle_files=False)
 
-  def to_features_dict(src, tgt):
-    return {'inputs': src, 'targets': tgt}
-  train_data = raw_train.map(to_features_dict, num_parallel_calls=AUTOTUNE)
-  eval_data = raw_valid.map(to_features_dict, num_parallel_calls=AUTOTUNE)
+  features_info = builder.info
 
-  return train_data, eval_data, None 
+  # standardize on 'inputs' and 'targets' features.
+  input_lang = features_info.supervised_keys[0]
+  target_lang = features_info.supervised_keys[1]
+  if reverse_translation:
+    input_lang, target_lang = target_lang, input_lang
+  def to_features_dict(x):
+    return {'inputs': x[input_lang], 'targets': x[target_lang]}
+  train_data = train_data.map(to_features_dict, num_parallel_calls=AUTOTUNE)
+  eval_data = eval_data.map(to_features_dict, num_parallel_calls=AUTOTUNE)
+
+  return train_data, eval_data, features_info
 
 
 # -----------------------------------------------------------------------------
@@ -432,10 +454,9 @@ def preprocess_wmt_data(dataset,
       l = tf.maximum(tf.shape(source)[0], tf.shape(target)[0])
       return tf.less(l, max_len + 1)
     return filter_fn
-  #print("before filtering: {} examples".format(len(list(dataset))))
+
   if max_length > 0:
     dataset = dataset.filter(length_filter(max_length))
-  #print("after filtering: {} examples".format(len(list(dataset))))
 
   if training:
     dataset = dataset.shuffle(shuffle_buffer_size)
